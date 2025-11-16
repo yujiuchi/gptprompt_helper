@@ -1,0 +1,124 @@
+javascript:(()=>{
+  fetch('https://yujiuchi.github.io/gptprompt_helper/prompt_template.json')
+    .then(r=>r.json())
+    .then(obj=>{
+      const data = Object.entries(obj).flatMap(([category, items]) =>
+        Object.entries(items).map(([title, prompt]) => ({ category, title, prompt }))
+      );
+
+      const categories=[...new Set(data.map(d=>d.category))];
+
+      const overlay=document.createElement('div');
+      overlay.style=`
+        position:fixed;top:0;left:0;width:100%;height:100%;
+        background:rgba(0,0,0,0.3);display:flex;
+        align-items:center;justify-content:center;z-index:9999;
+        font-family:sans-serif;`;
+
+      const dialog=document.createElement('div');
+      dialog.style=`
+        background:#fff;border-radius:12px;padding:20px 24px;
+        width:460px;box-shadow:0 4px 20px rgba(0,0,0,0.2);`;
+
+      const title=document.createElement('h2');
+      title.textContent='テンプレート選択';
+      title.style='margin:0 0 12px;font-size:18px;text-align:center;';
+      dialog.appendChild(title);
+
+      const catLabel=document.createElement('label');
+      catLabel.textContent='カテゴリー:';
+      catLabel.style='font-weight:bold;';
+      dialog.appendChild(catLabel);
+
+      const catSelect=document.createElement('select');
+      catSelect.style='width:100%;margin:4px 0 12px;padding:6px;';
+      categories.forEach(c=>{
+        const opt=document.createElement('option');
+        opt.value=c; opt.textContent=c;
+        catSelect.appendChild(opt);
+      });
+      dialog.appendChild(catSelect);
+
+      const listLabel=document.createElement('label');
+      listLabel.textContent='テンプレート一覧:';
+      listLabel.style='font-weight:bold;';
+      dialog.appendChild(listLabel);
+
+      const list=document.createElement('select');
+      list.size=5;
+      list.style=`
+        width:100%;margin:4px 0 12px;padding:6px;
+        border-radius:6px;border:1px solid #ccc;
+        background:#fafafa;`;
+      dialog.appendChild(list);
+
+      const preview=document.createElement('textarea');
+      preview.style=`
+        width:100%;height:120px;margin-bottom:14px;
+        padding:8px;border:1px solid #ccc;border-radius:6px;
+        font-size:13px;resize:none;`;
+      dialog.appendChild(preview);
+
+      const btnRow=document.createElement('div');
+      btnRow.style='text-align:right;display:flex;justify-content:flex-end;gap:8px;';
+
+      const cancelBtn=document.createElement('button');
+      cancelBtn.textContent='キャンセル';
+      cancelBtn.style=`
+        background:#e0e0e0;color:#333;border:none;border-radius:6px;
+        padding:6px 14px;font-size:14px;cursor:pointer;
+        transition:background 0.2s;`;
+      cancelBtn.onmouseenter=()=>cancelBtn.style.background='#d5d5d5';
+      cancelBtn.onmouseleave=()=>cancelBtn.style.background='#e0e0e0';
+
+      const okBtn=document.createElement('button');
+      okBtn.textContent='OK';
+      okBtn.style=`
+        background:#0069d9;color:#fff;border:none;border-radius:6px;
+        padding:6px 14px;font-size:14px;cursor:pointer;
+        transition:background 0.2s;`;
+      okBtn.onmouseenter=()=>okBtn.style.background='#0056b3';
+      okBtn.onmouseleave=()=>okBtn.style.background='#0069d9';
+
+      btnRow.appendChild(cancelBtn);
+      btnRow.appendChild(okBtn);
+      dialog.appendChild(btnRow);
+      overlay.appendChild(dialog);
+      document.body.appendChild(overlay);
+
+      const updateList=()=>{
+        list.innerHTML='';
+        data.filter(d=>d.category===catSelect.value).forEach(d=>{
+          const opt=document.createElement('option');
+          opt.value=d.prompt;
+          opt.textContent=d.title;
+          list.appendChild(opt);
+        });
+        preview.value='';
+      };
+
+      catSelect.onchange=updateList;
+      list.onchange=()=>preview.value=list.value;
+      cancelBtn.onclick=()=>overlay.remove();
+      okBtn.onclick=()=>{
+        const txt=list.value;
+        if(!txt){alert('テンプレートを選択してください');return;}
+        const ta=document.querySelector('textarea');
+        if(ta){
+          // 👇 setterでReact対応（value変更を内部的に通知）
+          const setter=Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype,'value').set;
+          setter.call(ta, txt);
+          ta.dispatchEvent(new Event('input',{bubbles:true}));
+          ta.dispatchEvent(new KeyboardEvent('keyup',{bubbles:true,key:'Enter'}));
+          overlay.remove();
+        }else{
+          alert('textareaが見つかりません');
+        }
+      };
+
+      updateList();
+    })
+    .catch(err=>{
+      alert('テンプレートの取得に失敗しました: '+err);
+    });
+})();
