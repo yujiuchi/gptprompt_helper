@@ -4,7 +4,7 @@ https://yujiuchi.github.io/gptprompt_helper/html_gptprompt.html
 
 ## 目的
 - 生成AIのプロンプト入力支援
-- 
+- テンプレートの自動更新
 
 ## 使い方
 - カテゴリー選択
