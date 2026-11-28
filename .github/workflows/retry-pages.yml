@@ -1,0 +1,51 @@
+name: Retry Pages deployment once
+
+'on':
+  workflow_run:
+    workflows: ["Deploy static content to Pages"]
+    types: [completed]
+    branches: [main]
+
+permissions: {}
+
+jobs:
+  retry:
+    if: >-
+      github.event.workflow_run.conclusion == 'failure' &&
+      github.event.workflow_run.run_attempt == 1 &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      actions: write
+      contents: read
+    concurrency:
+      group: pages-retry-${{ github.event.workflow_run.id }}
+      cancel-in-progress: false
+    steps:
+      - name: Re-run failed Pages jobs once
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          api="repos/$GITHUB_REPOSITORY"
+          sleep 600
+
+          status="$(gh api "$api/actions/runs/$RUN_ID" --jq '[.path,.head_branch,.event,.status,.conclusion,.run_attempt] | join("|")')"
+          case "$status" in
+            '.github/workflows/static.yml|main|push|completed|failure|1'|'.github/workflows/static.yml|main|workflow_dispatch|completed|failure|1') ;;
+            *) echo "Not an eligible first failure, or already retried."; exit 0 ;;
+          esac
+
+          latest="$(gh api "$api/actions/workflows/static.yml/runs?branch=main&per_page=1" --jq '.workflow_runs[0].id')"
+          tip="$(gh api "$api/git/ref/heads/main" --jq '.object.sha')"
+          if [[ "$latest" != "$RUN_ID" || "$tip" != "$HEAD_SHA" ]]; then
+            echo "A newer deployment or commit exists; skipping."
+            exit 0
+          fi
+
+          gh api --method POST "$api/actions/runs/$RUN_ID/rerun-failed-jobs"
+          echo "Requested a retry for Pages run $RUN_ID."
